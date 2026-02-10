@@ -20,6 +20,7 @@ const ARTICLE_DATE_CONCURRENCY = 6;
 let cache = {
   fetchedAt: 0,
   items: [],
+  stats: [],
 };
 
 function readSources() {
@@ -203,8 +204,10 @@ async function fetchFeed(url) {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "MalayalamHeadlinesPWA/1.0 (+https://localhost)",
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9,ml-IN;q=0.8,ml;q=0.7",
     },
     signal: controller.signal,
   }).finally(() => clearTimeout(timer));
@@ -220,8 +223,10 @@ async function fetchHtml(url) {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "MalayalamHeadlinesPWA/1.0 (+https://localhost)",
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9,ml-IN;q=0.8,ml;q=0.7",
     },
     signal: controller.signal,
   }).finally(() => clearTimeout(timer));
@@ -258,7 +263,11 @@ function extractFromHtml(source, html) {
     if (excludePatterns.length && matchesAny(abs, excludePatterns)) return;
     if (seen.has(abs)) return;
 
-    const title = normalizeWhitespace($(el).text());
+    let title =
+      normalizeWhitespace($(el).text()) ||
+      normalizeWhitespace($(el).attr("title")) ||
+      normalizeWhitespace($(el).attr("aria-label")) ||
+      normalizeWhitespace($(el).find("img").attr("alt"));
     if (title.length < 15 || title.length > 180) return;
     if (!hasMalayalam(title) || !isSpecificHeadline(title)) return;
     if (
@@ -319,7 +328,7 @@ async function loadHeadlines() {
           SOURCE_TIMEOUT_MS,
           `${source.name} feed`
         );
-        return (feed.items || [])
+        const items = (feed.items || [])
           .map((item) => {
             const description =
               item.contentSnippet || item.content || item.summary || "";
@@ -339,6 +348,7 @@ async function loadHeadlines() {
               hasMalayalam(item.title) &&
               isSpecificHeadline(item.title)
           );
+        return { source: source.name, items };
       }
 
       if (source.type === "html") {
@@ -347,18 +357,19 @@ async function loadHeadlines() {
           SOURCE_TIMEOUT_MS,
           `${source.name} html`
         );
-        return extractFromHtml(source, html).map((item) => ({
+        const items = extractFromHtml(source, html).map((item) => ({
           ...item,
           discoveredAt: fetchedAt,
         }));
+        return { source: source.name, items };
       }
 
-      return [];
+      return { source: source.name, items: [] };
     })
   );
 
   const items = results
-    .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+    .flatMap((r) => (r.status === "fulfilled" ? r.value.items : []))
     .filter((i) => i.title)
     .map((item) => {
       if (!item.pubDate) {
@@ -391,7 +402,24 @@ async function loadHeadlines() {
     return (b.discoveredAt || 0) - (a.discoveredAt || 0);
   });
 
-  return items;
+  const stats = results.map((r, idx) => {
+    const source = sources[idx]?.name || "Unknown";
+    if (r.status === "fulfilled") {
+      return {
+        source,
+        status: "ok",
+        count: r.value.items.length,
+      };
+    }
+    return {
+      source,
+      status: "error",
+      count: 0,
+      error: r.reason ? String(r.reason.message || r.reason) : "Unknown error",
+    };
+  });
+
+  return { items, stats };
 }
 
 app.get("/api/headlines", async (req, res) => {
@@ -415,17 +443,19 @@ app.get("/api/headlines", async (req, res) => {
         updatedAt: cache.fetchedAt,
         items: cache.items,
         cached: true,
+        stats: req.query.debug === "1" ? cache.stats : undefined,
       });
     }
 
-    const items = await loadHeadlines();
-    cache = { fetchedAt: Date.now(), items };
+    const { items, stats } = await loadHeadlines();
+    cache = { fetchedAt: Date.now(), items, stats };
     clearTimeout(requestTimeout);
     res.json({
       version: APP_VERSION,
       updatedAt: cache.fetchedAt,
       items,
       cached: false,
+      stats: req.query.debug === "1" ? stats : undefined,
     });
   } catch (err) {
     if (!res.headersSent) {
