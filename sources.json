@@ -46,11 +46,17 @@
       "url": "https://www.asianetnews.com/",
       "enabled": true,
       "includePatterns": [
-        "asianetnews\\.com/.+articleshow-[a-z0-9]+"
+        "asianetnews\\.com/[a-z-]+/.+-articleshow-[a-z0-9]+",
+        "asianetnews\\.com/[a-z-]+/.+-[a-z0-9]{4,}$"
       ],
       "excludePatterns": [
         "/live",
-        "/videos"
+        "/videos",
+        "/photo",
+        "/photogallery",
+        "/amp",
+        "/webstories",
+        "/webstory"
       ],
       "maxItems": 12
     },
@@ -96,12 +102,9 @@
     },
     {
       "name": "Reporter TV",
-      "type": "html",
-      "url": "https://www.reporterlive.com/",
+      "type": "rss",
+      "url": "https://www.reporterlive.com/tag/rss",
       "enabled": true,
-      "includePatterns": [
-        "reporterlive\\.com/.+/\\d{4}/\\d{2}/\\d{2}/"
-      ],
       "maxItems": 12
     },
     {
