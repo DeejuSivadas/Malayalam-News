@@ -10,6 +10,7 @@ const parser = new Parser({ timeout: 15000 });
 const PORT = process.env.PORT || 3000;
 const CACHE_MS = 5 * 60 * 1000;
 const SOURCES_PATH = path.join(__dirname, "sources.json");
+const APP_VERSION = "2026-02-10-1";
 const MAX_ARTICLE_DATE_FETCH = 50;
 const ARTICLE_DATE_CONCURRENCY = 6;
 
@@ -374,6 +375,7 @@ app.get("/api/headlines", async (req, res) => {
 
     if (!force && isFresh) {
       return res.json({
+        version: APP_VERSION,
         updatedAt: cache.fetchedAt,
         items: cache.items,
         cached: true,
@@ -382,7 +384,12 @@ app.get("/api/headlines", async (req, res) => {
 
     const items = await loadHeadlines();
     cache = { fetchedAt: Date.now(), items };
-    res.json({ updatedAt: cache.fetchedAt, items, cached: false });
+    res.json({
+      version: APP_VERSION,
+      updatedAt: cache.fetchedAt,
+      items,
+      cached: false,
+    });
   } catch (err) {
     res.status(500).json({
       error: "Failed to fetch headlines",
