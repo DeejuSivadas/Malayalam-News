@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ml">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Latest Malayalam headlines" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>Malayalam Headlines</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">MH</div>
+        <div>
+          <div class="title">Malayalam Headlines</div>
+          <div class="subtitle">Latest from major news sources</div>
+        </div>
+      </div>
+      <button id="refreshBtn" class="refresh" type="button">Refresh</button>
+    </header>
+
+    <main class="content">
+      <div class="status">
+        <div id="lastUpdated">Updating...</div>
+        <div id="cacheStatus"></div>
+      </div>
+      <section id="headlines" class="cards"></section>
+    </main>
+
+    <template id="cardTemplate">
+      <article class="card">
+        <div class="card-meta">
+          <span class="source"></span>
+          <span class="time"></span>
+        </div>
+        <h2 class="headline"></h2>
+        <p class="summary"></p>
+        <a class="link" target="_blank" rel="noopener">Open article</a>
+      </article>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

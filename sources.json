@@ -1,0 +1,168 @@
+{
+  "sources": [
+    {
+      "name": "Malayala Manorama (Manorama Online)",
+      "type": "html",
+      "url": "https://www.manoramaonline.com/",
+      "enabled": true,
+      "includePatterns": [
+        "manoramaonline\\.com/(news|sports|business|movies|life-style|health|auto|education|youth|travel|technology|world|india|kerala|opinion|podcast|career|lifestyle|entertainment|movie|crime|politics)/.+\\.html",
+        "manoramaonline\\.com/.+/\\d{4}/\\d{2}/\\d{2}/.+\\.html"
+      ],
+      "excludePatterns": [
+        "/epaper",
+        "/login",
+        "/subscribe",
+        "/premium"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Mathrubhumi",
+      "type": "html",
+      "url": "https://www.mathrubhumi.com/",
+      "enabled": true,
+      "includePatterns": [
+        "mathrubhumi\\.com/(news|sports|movies|business|technology|crime|health|life|entertainment|travel)/.+",
+        "mathrubhumi\\.com/.+\\-[a-z0-9]{6,}$"
+      ],
+      "excludePatterns": [
+        "/gallery",
+        "/videos",
+        "/premium",
+        "/live"
+      ],
+      "titleExcludeKeywords": [
+        "Personal Finance",
+        "Products and Services",
+        "Spiritual Travel",
+        "Bedtime Stories"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Asianet News",
+      "type": "html",
+      "url": "https://www.asianetnews.com/",
+      "enabled": true,
+      "includePatterns": [
+        "asianetnews\\.com/.+articleshow-[a-z0-9]+"
+      ],
+      "excludePatterns": [
+        "/live",
+        "/videos"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Kerala Kaumudi",
+      "type": "html",
+      "url": "https://keralakaumudi.com/",
+      "enabled": true,
+      "includePatterns": [
+        "keralakaumudi\\.com/news/news\\.php\\?id=\\d+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Deepika",
+      "type": "html",
+      "url": "https://www.deepika.com/",
+      "enabled": true,
+      "includePatterns": [
+        "deepika\\.com/[^/]+/[^/]+-\\d+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Mangalam",
+      "type": "html",
+      "url": "https://www.mangalam.com/",
+      "enabled": true,
+      "includePatterns": [
+        "mangalam\\.com/.+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Deshabhimani",
+      "type": "html",
+      "url": "https://www.deshabhimani.com/",
+      "enabled": true,
+      "includePatterns": [
+        "deshabhimani\\.com/News/.+-\\d+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Reporter TV",
+      "type": "html",
+      "url": "https://www.reporterlive.com/",
+      "enabled": true,
+      "includePatterns": [
+        "reporterlive\\.com/.+/\\d{4}/\\d{2}/\\d{2}/"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "News 24/7 (News Malayalam 24x7)",
+      "type": "html",
+      "url": "https://newsmalayalam.com/",
+      "enabled": true,
+      "includePatterns": [
+        "newsmalayalam\\.com/newsroom/.+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "24 News",
+      "type": "html",
+      "url": "https://www.twentyfournews.com/",
+      "enabled": true,
+      "includePatterns": [
+        "twentyfournews\\.com/\\d{4}/\\d{2}/\\d{2}/.+\\.html"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Kairali TV",
+      "type": "html",
+      "url": "https://www.kairalinewsonline.com/",
+      "enabled": true,
+      "includePatterns": [
+        "kairalinewsonline\\.com/(kerala|national|politics|crime|gulf|sports|entertainment|business|international|news)/.+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Madhyamam",
+      "type": "html",
+      "url": "https://www.madhyamam.com/",
+      "enabled": true,
+      "includePatterns": [
+        "madhyamam\\.com/(kerala|india|world|gulf-news|sports|business|entertainment|technology|health|travel|local|middle-east|news)/.+-\\d+"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Manorama News",
+      "type": "html",
+      "url": "https://www.manoramanews.com/",
+      "enabled": true,
+      "includePatterns": [
+        "manoramanews\\.com/.+\\.html"
+      ],
+      "maxItems": 12
+    },
+    {
+      "name": "Mathrubhumi News",
+      "type": "html",
+      "url": "https://tv.mathrubhumi.com/",
+      "enabled": true,
+      "includePatterns": [
+        "tv\\.mathrubhumi\\.com/.+"
+      ],
+      "maxItems": 12
+    }
+  ]
+}
