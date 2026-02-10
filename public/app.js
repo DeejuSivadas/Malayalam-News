@@ -3,6 +3,13 @@ const lastUpdatedEl = document.getElementById("lastUpdated");
 const cacheStatusEl = document.getElementById("cacheStatus");
 const refreshBtn = document.getElementById("refreshBtn");
 const template = document.getElementById("cardTemplate");
+const updateBanner = document.getElementById("updateBanner");
+const updateNowBtn = document.getElementById("updateNowBtn");
+const updateDismissBtn = document.getElementById("updateDismissBtn");
+const sourceFilter = document.getElementById("sourceFilter");
+
+const VERSION_KEY = "mh_app_version";
+let allItems = [];
 
 function formatTime(ts) {
   if (!ts) return "";
@@ -53,6 +60,32 @@ function render(items) {
   });
 }
 
+function updateSourceFilter(items) {
+  const sources = Array.from(
+    new Set(items.map((i) => i.source).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  const current = sourceFilter.value;
+  sourceFilter.innerHTML = `<option value="__all__">All sources</option>`;
+  sources.forEach((source) => {
+    const option = document.createElement("option");
+    option.value = source;
+    option.textContent = source;
+    sourceFilter.appendChild(option);
+  });
+  if (current && sources.includes(current)) {
+    sourceFilter.value = current;
+  }
+}
+
+function applyFilter() {
+  const selected = sourceFilter.value;
+  if (!selected || selected === "__all__") {
+    render(allItems);
+    return;
+  }
+  render(allItems.filter((i) => i.source === selected));
+}
+
 async function loadHeadlines(force = false) {
   lastUpdatedEl.textContent = "Updating...";
   cacheStatusEl.textContent = "";
@@ -60,9 +93,21 @@ async function loadHeadlines(force = false) {
     const res = await fetch(`/api/headlines${force ? "?force=1" : ""}`);
     if (!res.ok) throw new Error("Network error");
     const data = await res.json();
-    render(data.items || []);
+    allItems = data.items || [];
+    updateSourceFilter(allItems);
+    applyFilter();
     lastUpdatedEl.textContent = `Updated ${formatTime(data.updatedAt)}`;
     cacheStatusEl.textContent = data.cached ? "(cached)" : "";
+
+    if (data.version) {
+      const current = localStorage.getItem(VERSION_KEY);
+      if (current && current !== data.version) {
+        updateBanner.classList.remove("hidden");
+      } else {
+        updateBanner.classList.add("hidden");
+      }
+      localStorage.setItem(VERSION_KEY, data.version);
+    }
   } catch (err) {
     lastUpdatedEl.textContent = "Failed to update";
     cacheStatusEl.textContent = "Check server logs";
@@ -70,6 +115,14 @@ async function loadHeadlines(force = false) {
 }
 
 refreshBtn.addEventListener("click", () => loadHeadlines(true));
+sourceFilter.addEventListener("change", applyFilter);
+updateNowBtn.addEventListener("click", () => {
+  updateBanner.classList.add("hidden");
+  window.location.reload(true);
+});
+updateDismissBtn.addEventListener("click", () => {
+  updateBanner.classList.add("hidden");
+});
 
 loadHeadlines(true);
 

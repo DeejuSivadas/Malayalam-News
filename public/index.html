@@ -22,9 +22,22 @@
     </header>
 
     <main class="content">
+      <div id="updateBanner" class="banner hidden" role="status" aria-live="polite">
+        <div class="banner-text">Update available. Refresh to load the latest version.</div>
+        <div class="banner-actions">
+          <button id="updateNowBtn" class="banner-btn" type="button">Refresh now</button>
+          <button id="updateDismissBtn" class="banner-link" type="button">Not now</button>
+        </div>
+      </div>
       <div class="status">
         <div id="lastUpdated">Updating...</div>
         <div id="cacheStatus"></div>
+      </div>
+      <div class="filters">
+        <label class="filter-label" for="sourceFilter">Filter by source</label>
+        <select id="sourceFilter" class="filter-select">
+          <option value="__all__">All sources</option>
+        </select>
       </div>
       <section id="headlines" class="cards"></section>
     </main>
