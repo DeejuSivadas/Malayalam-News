@@ -10,6 +10,8 @@ const parser = new Parser({ timeout: 15000 });
 const PORT = process.env.PORT || 3000;
 const CACHE_MS = 5 * 60 * 1000;
 const SOURCES_PATH = path.join(__dirname, "sources.json");
+const MAX_ARTICLE_DATE_FETCH = 50;
+const ARTICLE_DATE_CONCURRENCY = 6;
 
 let cache = {
   fetchedAt: 0,
@@ -92,6 +94,106 @@ function parseDateFromText(text) {
   return "";
 }
 
+function parseDateFromUrl(url) {
+  if (!url) return "";
+  const match = url.match(/(\d{4})[/-](\d{2})[/-](\d{2})/);
+  if (!match) return "";
+  const [_, y, m, d] = match;
+  const date = new Date(`${y}-${m}-${d}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function extractPublishedTimeFromHtml(html) {
+  const $ = cheerio.load(html);
+  const candidates = [
+    'meta[property="article:published_time"]',
+    'meta[property="og:published_time"]',
+    'meta[name="pubdate"]',
+    'meta[name="publish-date"]',
+    'meta[name="publish_date"]',
+    'meta[name="date"]',
+    'meta[itemprop="datePublished"]',
+  ];
+
+  for (const selector of candidates) {
+    const content = $(selector).attr("content");
+    if (content) {
+      const parsed = new Date(content);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      const fallback = parseDateFromText(content);
+      if (fallback) return fallback;
+    }
+  }
+
+  const timeEl = $("time[datetime]").first();
+  if (timeEl.length) {
+    const val = timeEl.attr("datetime");
+    if (val) {
+      const parsed = new Date(val);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      const fallback = parseDateFromText(val);
+      if (fallback) return fallback;
+    }
+  }
+
+  // Try JSON-LD (very common on news sites)
+  const ldJson = $('script[type="application/ld+json"]')
+    .map((_, el) => $(el).text())
+    .get()
+    .filter(Boolean);
+
+  for (const raw of ldJson) {
+    try {
+      const parsed = JSON.parse(raw);
+      const nodes = Array.isArray(parsed) ? parsed : [parsed];
+      for (const node of nodes) {
+        if (node && typeof node === "object") {
+          const date =
+            node.datePublished ||
+            node.dateCreated ||
+            (node.mainEntity && node.mainEntity.datePublished);
+          if (date) {
+            const d = new Date(date);
+            if (!Number.isNaN(d.getTime())) return d.toISOString();
+            const fallback = parseDateFromText(date);
+            if (fallback) return fallback;
+          }
+        }
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+  }
+
+  return "";
+}
+
+async function runWithConcurrency(items, limit, fn) {
+  const queue = [...items];
+  const workers = Array.from({ length: limit }, async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      if (!item) break;
+      await fn(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
+async function enrichArticleDates(items) {
+  const missing = items.filter((i) => !i.pubDate && i.link);
+  const toFetch = missing.slice(0, MAX_ARTICLE_DATE_FETCH);
+  await runWithConcurrency(toFetch, ARTICLE_DATE_CONCURRENCY, async (item) => {
+    try {
+      const html = await fetchHtml(item.link);
+      const pubDate = extractPublishedTimeFromHtml(html);
+      if (pubDate) item.pubDate = pubDate;
+    } catch {
+      // Ignore individual failures to keep the batch moving
+    }
+  });
+}
+
 async function fetchFeed(url) {
   const res = await fetch(url, {
     headers: {
@@ -170,6 +272,9 @@ function extractFromHtml(source, html) {
     } else {
       pubDate = parseDateFromText(parent.text());
     }
+    if (!pubDate) {
+      pubDate = parseDateFromUrl(abs);
+    }
 
     seen.add(abs);
     items.push({
@@ -186,6 +291,7 @@ function extractFromHtml(source, html) {
 
 async function loadHeadlines() {
   const sources = readSources();
+  const fetchedAt = Date.now();
   const results = await Promise.allSettled(
     sources.map(async (source) => {
       if (source.type === "rss") {
@@ -199,8 +305,9 @@ async function loadHeadlines() {
               title: (item.title || "").trim(),
               link: item.link || "",
               source: source.name,
-              pubDate: item.isoDate || item.pubDate || "",
+              pubDate: item.isoDate || item.pubDate || parseDateFromUrl(item.link || ""),
               summary: firstSentence(clean),
+              discoveredAt: fetchedAt,
             };
           })
           .filter(
@@ -213,7 +320,10 @@ async function loadHeadlines() {
 
       if (source.type === "html") {
         const html = await fetchHtml(source.url);
-        return extractFromHtml(source, html);
+        return extractFromHtml(source, html).map((item) => ({
+          ...item,
+          discoveredAt: fetchedAt,
+        }));
       }
 
       return [];
@@ -223,11 +333,36 @@ async function loadHeadlines() {
   const items = results
     .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
     .filter((i) => i.title)
-    .sort((a, b) => {
-      const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-      const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-      return db - da;
+    .map((item) => {
+      if (!item.pubDate) {
+        item.pubDate = parseDateFromUrl(item.link || "");
+      }
+      const parsed = item.pubDate ? new Date(item.pubDate) : null;
+      if (parsed && !Number.isNaN(parsed.getTime())) {
+        item.pubDate = parsed.toISOString();
+      } else {
+        item.pubDate = "";
+      }
+      return item;
     });
+
+  await enrichArticleDates(items);
+
+  // Final safety: if still missing, try link-based date one last time.
+  for (const item of items) {
+    if (!item.pubDate && item.link) {
+      item.pubDate = parseDateFromUrl(item.link);
+    }
+  }
+
+  items.sort((a, b) => {
+    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    if (da && db) return db - da;
+    if (da && !db) return -1;
+    if (!da && db) return 1;
+    return (b.discoveredAt || 0) - (a.discoveredAt || 0);
+  });
 
   return items;
 }
