@@ -14,7 +14,7 @@ const APP_VERSION = "2026-02-10-1";
 const FETCH_TIMEOUT_MS = 8000;
 const SOURCE_TIMEOUT_MS = 9000;
 const REQUEST_TIMEOUT_MS = 15000;
-const MAX_ARTICLE_DATE_FETCH = 50;
+const MAX_ARTICLE_DATE_FETCH = 80;
 const ARTICLE_DATE_CONCURRENCY = 6;
 
 let cache = {
@@ -419,11 +419,23 @@ async function loadHeadlines() {
     };
   });
 
-  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const recentItems = items.filter((item) => {
-    if (!item.pubDate) return false;
-    const ts = new Date(item.pubDate).getTime();
-    return ts && ts >= cutoff;
+    if (item.pubDate) {
+      const ts = new Date(item.pubDate).getTime();
+      return ts && ts >= cutoff;
+    }
+    // If publish time is missing, keep recently discovered items.
+    return item.discoveredAt && item.discoveredAt >= cutoff;
+  });
+
+  // Re-sort so missing timestamps still surface using discoveredAt.
+  recentItems.sort((a, b) => {
+    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    const ta = da || a.discoveredAt || 0;
+    const tb = db || b.discoveredAt || 0;
+    return tb - ta;
   });
 
   return { items: recentItems, stats };
