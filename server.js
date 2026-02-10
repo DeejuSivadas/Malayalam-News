@@ -419,7 +419,14 @@ async function loadHeadlines() {
     };
   });
 
-  return { items, stats };
+  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  const recentItems = items.filter((item) => {
+    if (!item.pubDate) return false;
+    const ts = new Date(item.pubDate).getTime();
+    return ts && ts >= cutoff;
+  });
+
+  return { items: recentItems, stats };
 }
 
 app.get("/api/headlines", async (req, res) => {
