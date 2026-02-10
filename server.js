@@ -11,6 +11,9 @@ const PORT = process.env.PORT || 3000;
 const CACHE_MS = 5 * 60 * 1000;
 const SOURCES_PATH = path.join(__dirname, "sources.json");
 const APP_VERSION = "2026-02-10-1";
+const FETCH_TIMEOUT_MS = 8000;
+const SOURCE_TIMEOUT_MS = 9000;
+const REQUEST_TIMEOUT_MS = 15000;
 const MAX_ARTICLE_DATE_FETCH = 50;
 const ARTICLE_DATE_CONCURRENCY = 6;
 
@@ -196,12 +199,15 @@ async function enrichArticleDates(items) {
 }
 
 async function fetchFeed(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     headers: {
       "User-Agent": "MalayalamHeadlinesPWA/1.0 (+https://localhost)",
       "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
     },
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: ${res.status}`);
   }
@@ -210,16 +216,28 @@ async function fetchFeed(url) {
 }
 
 async function fetchHtml(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     headers: {
       "User-Agent": "MalayalamHeadlinesPWA/1.0 (+https://localhost)",
       Accept: "text/html,application/xhtml+xml",
     },
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: ${res.status}`);
   }
   return res.text();
+}
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout: ${label}`)), ms)
+    ),
+  ]);
 }
 
 function extractFromHtml(source, html) {
@@ -296,7 +314,11 @@ async function loadHeadlines() {
   const results = await Promise.allSettled(
     sources.map(async (source) => {
       if (source.type === "rss") {
-        const feed = await fetchFeed(source.url);
+        const feed = await withTimeout(
+          fetchFeed(source.url),
+          SOURCE_TIMEOUT_MS,
+          `${source.name} feed`
+        );
         return (feed.items || [])
           .map((item) => {
             const description =
@@ -320,7 +342,11 @@ async function loadHeadlines() {
       }
 
       if (source.type === "html") {
-        const html = await fetchHtml(source.url);
+        const html = await withTimeout(
+          fetchHtml(source.url),
+          SOURCE_TIMEOUT_MS,
+          `${source.name} html`
+        );
         return extractFromHtml(source, html).map((item) => ({
           ...item,
           discoveredAt: fetchedAt,
@@ -370,10 +396,20 @@ async function loadHeadlines() {
 
 app.get("/api/headlines", async (req, res) => {
   try {
+    const requestTimeout = setTimeout(() => {
+      res.status(504).json({
+        version: APP_VERSION,
+        error: "Request timed out",
+        message:
+          "Upstream sources are slow. Try again in a few seconds or use cached results.",
+      });
+    }, REQUEST_TIMEOUT_MS);
+
     const force = req.query.force === "1";
     const isFresh = Date.now() - cache.fetchedAt < CACHE_MS;
 
     if (!force && isFresh) {
+      clearTimeout(requestTimeout);
       return res.json({
         version: APP_VERSION,
         updatedAt: cache.fetchedAt,
@@ -384,6 +420,7 @@ app.get("/api/headlines", async (req, res) => {
 
     const items = await loadHeadlines();
     cache = { fetchedAt: Date.now(), items };
+    clearTimeout(requestTimeout);
     res.json({
       version: APP_VERSION,
       updatedAt: cache.fetchedAt,
@@ -391,11 +428,18 @@ app.get("/api/headlines", async (req, res) => {
       cached: false,
     });
   } catch (err) {
-    res.status(500).json({
-      error: "Failed to fetch headlines",
-      message: err.message,
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        version: APP_VERSION,
+        error: "Failed to fetch headlines",
+        message: err.message,
+      });
+    }
   }
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", version: APP_VERSION, time: Date.now() });
 });
 
 app.use(express.static(path.join(__dirname, "public")));
