@@ -21,18 +21,6 @@ function formatTime(ts) {
   });
 }
 
-function formatAge(pubDate) {
-  if (!pubDate) return "";
-  const d = new Date(pubDate);
-  if (Number.isNaN(d.getTime())) return "";
-  const minutes = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
-
 function render(items) {
   headlinesEl.innerHTML = "";
   if (!items.length) {
@@ -46,7 +34,6 @@ function render(items) {
   items.forEach((item) => {
     const node = template.content.cloneNode(true);
     node.querySelector(".source").textContent = item.source || "Unknown";
-    node.querySelector(".time").textContent = formatAge(item.pubDate);
     node.querySelector(".headline").textContent = item.title;
     node.querySelector(".summary").textContent = item.summary || "";
     const link = node.querySelector(".link");
